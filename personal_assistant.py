@@ -2,10 +2,12 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 import json
 import re
+import os
 
 
 class PersonalAssistant:
     def __init__(self):
+        self.notes = {}
         self.contacts = {}
         self.modified = False
 
@@ -54,7 +56,7 @@ class PersonalAssistant:
             return f'Contact "{name}", added successfully!'
         
 
-    def add_email(self, args):                                          ####################################
+    def add_email(self, args):                                         ###########################
         if len(args) != 2:
             return "Please provide both a name and an email address!"
         
@@ -117,8 +119,61 @@ class PersonalAssistant:
         return f'Address updated successfully for contact "{name}"!'
     
 
+                                                               
+    def add_note(self, note_id, content):                                  
+        if note_id in self.notes:
+            return f'Note with ID "{note_id}" already exists!'
+        else:
+            self.notes[note_id] = content
+            self.modified = True
+            self.save_to_file("personal_assistant_notes.json")
+            return f'Note with ID "{note_id}" added successfully!'
+
+
+    def show_all_notes(self):
+        if not self.notes:
+            return "No notes found."
+
+        all_notes = []
+        for note_id, content in self.notes.items():
+            all_notes.append(f"Note ID: {note_id}\nContent: {content}")
+
+        return '\n\n'.join(all_notes)
+
+
+    def edit_note(self, note_id, new_content):
+        if note_id not in self.notes:
+            return f'Note with ID "{note_id}" not found!'
+        else:
+            self.notes[note_id] = new_content
+            self.modified = True
+            self.save_to_file("personal_assistant_notes.json")
+            return f'Note with ID "{note_id}" edited successfully!'
+        
+
+    def delete_note(self, note_id):
+        if note_id not in self.notes:
+            return f'Note with ID "{note_id}" not found!'
+        else:
+            del self.notes[note_id]
+            self.modified = True
+            self.save_to_file("personal_assistant_notes.json")
+            return f'Note with ID "{note_id}" deleted successfully!'
+        
+
+    def search_notes_by_keyword(self, keyword):
+        found_notes = []
+        for note_id, content in self.notes.items():
+            if keyword.lower() in content.lower():
+                found_notes.append((note_id, content))
+        if found_notes:
+            return found_notes
+        else:
+            return f'No notes found containing the keyword "{keyword}".'
+    
+
                                                                        
-    def update_contact(self, args):                                     ##########################################
+    def update_contact(self, args):                       ####################################
         if len(args) != 2:
             return "Please provide both a name and a phone number!"
         name, phone = args
@@ -262,12 +317,23 @@ class PersonalAssistant:
         with open(filename, 'w') as file:
             json.dump(self.contacts, file)
 
+    def save_notes_to_file(self, filename):
+        with open(filename, 'w') as file:
+            json.dump(self.notes, file)
+
     def load_from_file(self, filename):
         try:
             with open(filename, 'r') as file:
                 self.contacts = json.load(file)
         except FileNotFoundError:
             print("No previous data found. Starting with an empty address book.")
+        
+    def load_notes_from_file(self, filename):
+        try:
+            with open(filename, 'r') as file:
+                self.notes = json.load(file)
+        except FileNotFoundError:
+            print("No previous notes found. Starting with an empty notes list.")
 
 
     def sort_contacts(self):
@@ -280,8 +346,10 @@ class PersonalAssistant:
 def main():
     personal_assistant = PersonalAssistant()
     filename = "personal_assistant.json"
+    filename_notes = "personal_assistant_notes.json"
     personal_assistant.load_from_file(filename)
-    
+    personal_assistant.load_notes_from_file(filename_notes)
+
 
     print('\nWelcome to your assistant bot!\nIf you need help with the commands, please type "help".')
 
@@ -298,6 +366,7 @@ def main():
                 save_choice = input("Do you want to save changes to the address book, before exiting? (yes/no): ")
                 if save_choice.lower() == "yes":
                     personal_assistant.save_to_file(filename)
+                    personal_assistant.save_notes_to_file(filename_notes)
                     print("Saved")
             print("Goodbye!")
             break
@@ -307,13 +376,54 @@ def main():
 
         elif command == "help":
             print('\nPlease use one of the commands bellow:')
-            print('"add ___" - To add a new contact, (name and number)\n"edit ___" - To edit an existing contact\'s number, (name + new number)\n"edit-name ___" - To edit the name of an existing contact, (old name + new name)')
-            print('"add-address ___" - To add an address for an existing contact, (contact name  + house number, street, city, country)\n"edit-address ___" - To edit the address of a contact, (contact name + new address)')
-            print('"show ___" - To display a specific contact,\n"all" - To display all contacts,\n"add-email ___" - To add an email address to an existing contact, (this command can also change the current email),')
-            print('"add-birthday ___" - To add birthday to an existing contact, (DD/MM/YYYY)\n"delete ___" - To delete a contact,\n"clear_all" - To delete all contacts,')
-            print('"show-birthday ___" - To display the birthday of a contact,\n"birthdays" - To display the birthdays of contacts occurring in the next week,')
+            print('"add ___"             - To add a new contact, (name and number)\n"edit ___"            - To edit an existing contact\'s number, (name + new number)\n"edit-name ___"       - To edit the name of an existing contact, (old name + new name)')
+            print('"add-address ___"     - To add an address for an existing contact, (contact name  + house number, street, city, country)\n"edit-address ___"    - To edit the address of a contact, (contact name + new address)')
+            print('"show ___"            - To display a specific contact,\n"contacts"            - To display all contacts,\n"add-email ___"       - To add an email address to an existing contact, (this command can also change the current email),')
+            print('"add-birthday ___"    - To add birthday to an existing contact, (DD/MM/YYYY)\n"delete ___"          - To delete a contact,\n"clear_all"           - To delete all contacts,')
+            print('"show-birthday ___"   - To display the birthday of a contact,\n"birthdays"           - To display the birthdays of contacts occurring in the next week,')
+            print('"add-note ___"        - To start writing your note, (note ID + your text)\n"edit-note ___"       - To edit an existing note, (note ID + new text)\n"notes"               - To display all notes,')
+            print('"delete-note ___"     - To delete an existing note, (note ID),\n"search-note___"      - To find a specific note by a keyword, (keyword)\n"notes"               - To see all notes,')
             print('And "exit" or "close"')
 
+        elif command == "add-note":                                 
+            if len(args) < 2:
+                print("Please provide a note ID and content.")
+            else:
+                note_id, content = args[0], ' '.join(args[1:])
+                print(personal_assistant.add_note(note_id, content))
+
+        elif command == "edit-note":
+            if len(args) < 2:
+                print("Please provide a note ID and new content.")
+            else:
+                note_id, new_content = args[0], ' '.join(args[1:])
+                print(personal_assistant.edit_note(note_id, new_content))
+
+        elif command == "delete-note":
+            if len(args) != 1:
+                print("Please provide the note ID to delete.")
+            else:
+                note_id = args[0]
+                print(personal_assistant.delete_note(note_id))
+
+        elif command == "notes":
+            print(personal_assistant.show_all_notes())
+
+        elif command == "search-note":
+            if len(args) != 1:
+                print("Please provide a keyword to search.")
+            else:
+                keyword = args[0]
+                results = personal_assistant.search_notes_by_keyword(keyword)
+                if isinstance(results, str):
+                    print(results)
+                else:
+                    print("Notes containing the keyword:")
+                    for note_id, content in results:
+                        print(f"ID: {note_id}, Content: {content}")         
+
+        
+        
         elif command == "add":
             print(personal_assistant.add_contact(args))
 
@@ -335,7 +445,7 @@ def main():
         elif command == "show":
             print(personal_assistant.show_phone(args))
 
-        elif command == "all":
+        elif command == "contacts":
             print(personal_assistant.show_all())
 
         elif command == "delete":
